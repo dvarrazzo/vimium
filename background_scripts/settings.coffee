@@ -18,16 +18,20 @@ root.Settings = Settings =
 
   has: (key) -> key of localStorage
 
+  # options/options.(coffee|html) only handle booleans and strings; therefore
+  # all defaults must be booleans or strings
   defaults:
     scrollStepSize: 60
     linkHintCharacters: "sadfjklewcmpgh"
+    linkHintNumbers: "0123456789"
     filterLinkHints: false
     hideHud: false
     userDefinedLinkHintCss:
       """
       div > .vimiumHintMarker {
       /* linkhint boxes */
-      background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#FFF785), color-stop(100%,#FFC542));
+      background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#FFF785),
+        color-stop(100%,#FFC542));
       border: 1px solid #E3BE23;
       }
 
@@ -55,17 +59,12 @@ root.Settings = Settings =
     previousPatterns: "prev,previous,back,<,\u2190,\xab,\u226a,<<"
     # "\bnext\b,\bmore\b,>,→,»,≫,>>"
     nextPatterns: "next,more,>,\u2192,\xbb,\u226b,>>"
+    # default/fall back search engine
+    searchUrl: "http://www.google.com/search?q="
 
-# Initialization code.
-# settingsVersion was introduced in v1.31, and is used to coordinate data migration. We do not use
-# previousVersion as it is used to coordinate the display of the upgrade message, and is not updated
-# early enough when the extension loads.
-# 1.31 was also the version where we converted all localStorage values to JSON.
-if (!Settings.has("settingsVersion"))
-  for key of localStorage
-    # filterLinkHints' checkbox state used to be stored as a string
-    if (key == "filterLinkHints")
-      localStorage[key] = if (localStorage[key] == "true") then true else false
-    else
-      localStorage[key] = JSON.stringify(localStorage[key])
-  Settings.set("settingsVersion", Utils.getCurrentVersion())
+    settingsVersion: Utils.getCurrentVersion()
+
+# We use settingsVersion to coordinate any necessary schema changes.
+if Utils.compareVersions("1.42", Settings.get("settingsVersion")) != -1
+  Settings.set("scrollStepSize", parseFloat Settings.get("scrollStepSize"))
+Settings.set("settingsVersion", Utils.getCurrentVersion())

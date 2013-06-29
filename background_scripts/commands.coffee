@@ -21,6 +21,7 @@ Commands =
       description: description
       isBackgroundCommand: options.background
       passCountToFunction: options.passCountToFunction
+      noRepeat: options.noRepeat
 
   mapKeyToCommand: (key, command) ->
     unless @availableCommands[command]
@@ -31,6 +32,7 @@ Commands =
       command: command
       isBackgroundCommand: @availableCommands[command].isBackgroundCommand
       passCountToFunction: @availableCommands[command].passCountToFunction
+      noRepeat: @availableCommands[command].noRepeat
 
   unmapKey: (key) -> delete @keyToCommandRegistry[key]
 
@@ -43,9 +45,9 @@ Commands =
   # On the other hand, <c-a> and <c-A> are different named keys - for one of
   # them you have to press "shift" as well.
   normalizeKey: (key) ->
-      key.replace(/<[acm]-/ig, (match) -> match.toLowerCase())
-          .replace(/<([acm]-)?([a-zA-Z0-9]{2,5})>/g, (match, optionalPrefix, keyName) ->
-            "<" + (if optionalPrefix then optionalPrefix else "") + keyName.toLowerCase() + ">")
+    key.replace(/<[acm]-/ig, (match) -> match.toLowerCase())
+       .replace(/<([acm]-)?([a-zA-Z0-9]{2,5})>/g, (match, optionalPrefix, keyName) ->
+          "<" + (if optionalPrefix then optionalPrefix else "") + keyName.toLowerCase() + ">")
 
   parseCustomKeyMappings: (customKeyMappings) ->
     lines = customKeyMappings.split("\n")
@@ -88,17 +90,17 @@ Commands =
        "scrollToTop", "scrollToBottom", "scrollToLeft", "scrollToRight", "scrollPageDown",
        "scrollPageUp", "scrollFullPageUp", "scrollFullPageDown",
        "reload", "toggleViewSource", "copyCurrentUrl", "LinkHints.activateModeToCopyLinkUrl",
-       "openCopiedUrlInCurrentTab", "openCopiedUrlInNewTab", "goUp", "goInc", "goDec",
+       "openCopiedUrlInCurrentTab", "openCopiedUrlInNewTab", "goUp", "goInc", "goDec", "goToRoot",
        "enterInsertMode", "focusInput",
        "LinkHints.activateMode", "LinkHints.activateModeToOpenInNewTab", "LinkHints.activateModeWithQueue",
        "Vomnibar.activate", "Vomnibar.activateInNewTab", "Vomnibar.activateTabSelection",
        "Vomnibar.activateBookmarks", "Vomnibar.activateBookmarksInNewTab",
-       "goPrevious", "goNext", "nextFrame"]
+       "goPrevious", "goNext", "nextFrame", "Marks.activateCreateMode", "Marks.activateGotoMode"]
     findCommands: ["enterFindMode", "performFind", "performBackwardsFind"]
     historyNavigation:
       ["goBack", "goForward"]
     tabManipulation:
-      ["nextTab", "previousTab", "firstTab", "lastTab", "createTab", "removeTab", "restoreTab"]
+      ["nextTab", "previousTab", "firstTab", "lastTab", "createTab", "duplicateTab", "removeTab", "restoreTab"]
     misc:
       ["showHelp"]
 
@@ -106,9 +108,10 @@ Commands =
   # a focused, high-signal set of commands to the new and casual user. Only those truly hungry for more power
   # from Vimium will uncover these gems.
   advancedCommands: [
-    "scrollToLeft", "scrollToRight",
-    "goUp", "goInc", "goDec", "focusInput", "LinkHints.activateModeWithQueue",
-    "goPrevious", "goNext"]
+    "scrollToLeft", "scrollToRight", "moveTabToNewWindow",
+    "goUp", "goInc", "goDec", "goToRoot", "focusInput", "LinkHints.activateModeWithQueue",
+    "LinkHints.activateModeToOpenIncognito", "goNext", "goPrevious", "Marks.activateCreateMode",
+    "Marks.activateGotoMode"]
 
 defaultKeyMappings =
   "?": "showHelp"
@@ -133,6 +136,7 @@ defaultKeyMappings =
   "H": "goBack"
   "L": "goForward"
   "gu": "goUp"
+  "gU": "goToRoot"
   "<c-a>": "goInc"
   "<c-x>": "goDec"
 
@@ -162,7 +166,9 @@ defaultKeyMappings =
   "g0": "firstTab"
   "g$": "lastTab"
 
+  "W": "moveTabToNewWindow"
   "t": "createTab"
+  "yt": "duplicateTab"
   "x": "removeTab"
   "X": "restoreTab"
 
@@ -175,6 +181,9 @@ defaultKeyMappings =
   "B": "Vomnibar.activateBookmarksInNewTab"
 
   "gf": "nextFrame"
+
+  "m": "Marks.activateCreateMode"
+  "`": "Marks.activateGotoMode"
 
 
 # This is a mapping of: commandIdentifier => [description, options].
@@ -211,6 +220,8 @@ commandDescriptions =
   'LinkHints.activateModeToOpenInNewTab': ["Open a link in a new tab"]
   'LinkHints.activateModeWithQueue': ["Open multiple links in a new tab"]
 
+  "LinkHints.activateModeToOpenIncognito": ["Open a link in incognito window"]
+
   enterFindMode: ["Enter find mode"]
   performFind: ["Cycle forward to the next find match"]
   performBackwardsFind: ["Cycle backward to the previous find match"]
@@ -224,6 +235,7 @@ commandDescriptions =
 
   # Navigating the URL hierarchy
   goUp: ["Go up the URL hierarchy", { passCountToFunction: true }]
+  goToRoot: ["Go to root of current URL hierarchy", { passCountToFunction: true }]
   goInc: ["Increment the last number found in the url", { passCountToFunction: true }]
   goDec: ["Decrement the last number found in the url", { passCountToFunction: true }]
 
@@ -233,8 +245,10 @@ commandDescriptions =
   firstTab: ["Go to the first tab", { background: true }]
   lastTab: ["Go to the last tab", { background: true }]
   createTab: ["Create new tab", { background: true }]
-  removeTab: ["Close current tab", { background: true }]
+  duplicateTab: ["Duplicate current tab", { background: true }]
+  removeTab: ["Close current tab", { background: true, noRepeat: true }]
   restoreTab: ["Restore closed tab", { background: true }]
+  moveTabToNewWindow: ["Move tab to new window", { background: true }]
 
   "Vomnibar.activate": ["Open URL, bookmark, or history entry"]
   "Vomnibar.activateInNewTab": ["Open URL, bookmark, history entry, in a new tab"]
@@ -243,6 +257,9 @@ commandDescriptions =
   "Vomnibar.activateBookmarksInNewTab": ["Open a bookmark in a new tab"]
 
   nextFrame: ["Cycle forward to the next frame on the page", { background: true, passCountToFunction: true }]
+
+  "Marks.activateCreateMode": ["Create a new mark"]
+  "Marks.activateGotoMode": ["Go to a mark"]
 
 Commands.init()
 

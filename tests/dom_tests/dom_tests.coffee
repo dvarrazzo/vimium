@@ -2,7 +2,7 @@
 # Dispatching keyboard events via the DOM would require async tests,
 # which tend to be more complicated. Here we create mock events and
 # invoke the handlers directly.
-# 
+#
 mockKeyboardEvent = (keyChar) ->
   event = {}
   event.charCode = (if keyCodes[keyChar] isnt undefined then keyCodes[keyChar] else keyChar.charCodeAt(0))
@@ -14,14 +14,14 @@ mockKeyboardEvent = (keyChar) ->
 
 #
 # Retrieve the hint markers as an array object.
-# 
+#
 getHintMarkers = ->
   Array::slice.call document.getElementsByClassName("vimiumHintMarker"), 0
 
 #
 # Generate tests that are common to both default and filtered
 # link hinting modes.
-# 
+#
 createGeneralHintTests = (isFilteredMode) ->
 
   context "Link hints",
@@ -94,6 +94,7 @@ context "Filtered link hints",
 
   setup ->
     stub settings.values, "filterLinkHints", true
+    stub settings.values, "linkHintNumbers", "0123456789"
 
   context "Text hints",
 
@@ -125,7 +126,8 @@ context "Filtered link hints",
   context "Image hints",
 
     setup ->
-      testContent = "<a><img alt='alt text'/></a>" + "<a><img alt='alt text' title='some title'/></a>" + "<a><img title='some title'/></a>" + "<a><img src='' width='320px' height='100px'/></a>"
+      testContent = "<a><img alt='alt text'/></a><a><img alt='alt text' title='some title'/></a>
+        <a><img title='some title'/></a>" + "<a><img src='' width='320px' height='100px'/></a>"
       document.getElementById("test-div").innerHTML = testContent
       LinkHints.activateMode()
 
@@ -143,7 +145,10 @@ context "Filtered link hints",
   context "Input hints",
 
     setup ->
-      testContent = "<input type='text' value='some value'/>" + "<input type='password' value='some value'/>" + "<textarea>some text</textarea>" + "<label for='test-input'/>a label</label><input type='text' id='test-input' value='some value'/>" + "<label for='test-input-2'/>a label: </label><input type='text' id='test-input-2' value='some value'/>"
+      testContent = "<input type='text' value='some value'/><input type='password' value='some value'/>
+        <textarea>some text</textarea><label for='test-input'/>a label</label>
+        <input type='text' id='test-input' value='some value'/>
+        <label for='test-input-2'/>a label: </label><input type='text' id='test-input-2' value='some value'/>"
       document.getElementById("test-div").innerHTML = testContent
       LinkHints.activateMode()
 
@@ -162,7 +167,8 @@ context "Filtered link hints",
 context "Input focus",
 
   setup ->
-    testContent = "<input type='text' id='first'/>" + "<input style='display:none;' id='second'/>" + "<input type='password' id='third' value='some value'/>"
+    testContent = "<input type='text' id='first'/><input style='display:none;' id='second'/>
+      <input type='password' id='third' value='some value'/>"
     document.getElementById("test-div").innerHTML = testContent
 
   tearDown ->
@@ -172,26 +178,42 @@ context "Input focus",
     focusInput 1
     assert.equal "first", document.activeElement.id
     # deactivate the tabbing mode and its overlays
-    handlerStack[handlerStack.length - 1].keydown mockKeyboardEvent("A")
+    handlerStack.bubbleEvent 'keydown', mockKeyboardEvent("A")
 
     focusInput 100
     assert.equal "third", document.activeElement.id
-    handlerStack[handlerStack.length - 1].keydown mockKeyboardEvent("A")
+    handlerStack.bubbleEvent 'keydown', mockKeyboardEvent("A")
 
-Tests.outputMethod = (args...) ->
-  newOutput = args.join "\n"
-  # escape html
-  newOutput = newOutput.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-  # highlight the source of the error
-  newOutput = newOutput.replace(/\/([^:/]+):([0-9]+):([0-9]+)/, "/<span class='errorPosition'>$1:$2</span>:$3")
-  document.getElementById("output-div").innerHTML += "<div class='output-section'>" + newOutput + "</div>"
-  console.log.apply console, args
+context "Find prev / next links",
 
-# PhantomJS will call the tests manually
-unless navigator.userAgent == 'phantom'
-  # ensure the extension has time to load before commencing the tests
-  document.addEventListener "DOMContentLoaded", ->
-    setTimeout Tests.run, 200
+  setup ->
+    window.location.hash = ""
+
+  should "find exact matches", ->
+    document.getElementById("test-div").innerHTML = """
+    <a href='#first'>nextcorrupted</a>
+    <a href='#second'>next page</a>
+    """
+    stub settings.values, "nextPatterns", "next"
+    goNext()
+    assert.equal '#second', window.location.hash
+
+  should "match against non-word patterns", ->
+    document.getElementById("test-div").innerHTML = """
+    <a href='#first'>&gt;&gt;</a>
+    """
+    stub settings.values, "nextPatterns", ">>"
+    goNext()
+    assert.equal '#first', window.location.hash
+
+  should "favor matches with fewer words", ->
+    document.getElementById("test-div").innerHTML = """
+    <a href='#first'>lorem ipsum next</a>
+    <a href='#second'>next!</a>
+    """
+    stub settings.values, "nextPatterns", "next"
+    goNext()
+    assert.equal '#second', window.location.hash
 
 createLinks = (n) ->
   for i in [0...n] by 1
